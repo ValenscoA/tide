@@ -1,0 +1,45 @@
+[package]
+name = "tidal-tui"
+version = "0.1.0"
+edition = "2021"
+description = "Full-featured terminal music player for Tidal"
+license = "MIT"
+
+[[bin]]
+name = "tide"
+path = "src/main.rs"
+
+[dependencies]
+clap          = { version = "4",    features = ["derive"] }
+reqwest       = { version = "0.12", features = ["blocking", "json", "stream"] }
+serde         = { version = "1",    features = ["derive"] }
+serde_json    = "1"
+ratatui       = "0.29"
+ratatui-image = { version = "8", default-features = false, features = ["crossterm"] }
+crossterm     = "0.28"
+cpal          = "0.15"
+symphonia     = { version = "0.5",  default-features = false, features = ["flac", "mp3", "aac", "isomp4"] }
+lofty         = "0.22"
+rustfft       = "6"
+image         = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+anyhow        = "1"
+chrono        = { version = "0.4",  features = ["serde"] }
+dirs          = "5"
+tempfile      = "3"
+rand          = "0.8"
+base64        = "0.22"
+sha2          = "0.10"
+aes           = "0.8"
+cbc           = "0.1"
+ctr           = "0.9"
+color_quant   = "1"
+metaflac      = "0.2"
+dialoguer     = "0.11"
+fuzzy-matcher = "0.3"
+souvlaki      = { version = "0.8", default-features = false, features = ["use_zbus"] }
+
+[target.'cfg(windows)'.dependencies]
+rfd = { version = "0.15", default-features = false }
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1"
