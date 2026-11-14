@@ -2,6 +2,8 @@
 
 A minimalist, transparent Rust terminal music player for Tidal built with `ratatui`, `cpal`, `symphonia`, `ratatui-image`, and `souvlaki`.
 
+![Tide Now Playing Screenshot](assets/screenshot.png)
+
 ## Features
 
 - **Minimalist Transparent Now Playing Canvas**
