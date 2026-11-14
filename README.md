@@ -4,6 +4,8 @@ A minimalist, transparent Rust terminal music player for Tidal built with `ratat
 
 ![Tide Now Playing Screenshot](assets/screenshot.png)
 
+![Tide Browser & Search Overlay](assets/browser.png)
+
 ## Features
 
 - **Minimalist Transparent Now Playing Canvas**
