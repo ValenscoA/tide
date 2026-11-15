@@ -4,6 +4,7 @@ mod audio;
 mod auth;
 mod config;
 mod cover;
+mod discord;
 mod download_queue;
 mod lyrics;
 mod metadata;
@@ -172,6 +173,7 @@ fn main() -> Result<()> {
     }
 
     app.audio.stop();
+    app.discord.shutdown();
     restore_terminal(&mut terminal);
     Ok(())
 }

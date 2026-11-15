@@ -31,6 +31,7 @@ A minimalist, transparent Rust terminal music player for Tidal built with `ratat
   - Defaults to **Album Art** vibrant accent color extraction; cycle themes anytime with `t` (**Album Art** -> **Omarchy** `~/.local/state/omarchy/current/theme/colors.toml` -> **Pywal** `~/.cache/wal/colors.json` -> **Dark**).
   - Automatic session import (and token refresh) from `~/.config/tidal-tui/session.json`, `~/.config/lumitide/session.json`, `~/.config/tide/session.json`, and `~/.config/undertow/.../session.json`, plus non-blocking in-TUI OAuth device-code sign-in (`Ctrl+L`).
   - MPRIS media controls & hardware media keys (`souvlaki`).
+  - Built-in Discord Rich Presence (`SET_ACTIVITY` over Discord IPC socket with album art, listening status, timestamps, and track link).
   - Full Vim + arrow keyboard navigation and mouse support (click to select/play, scroll wheel volume/lists).
   - Live `cpal` audio output device picker and cache stats in **Settings**.
 

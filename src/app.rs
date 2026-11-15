@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use fuzzy_matcher::skim::SkimMatcherV2;
@@ -20,6 +20,7 @@ use crate::audio::{self, AudioEngine, RepeatMode};
 use crate::auth::{self, DeviceAuthState, DevicePollResult, Session};
 use crate::config::{self, Config, ThemeMode};
 use crate::cover::CoverManager;
+use crate::discord::{DiscordPresence, DiscordRpcBridge};
 use crate::download_queue::DownloadQueue;
 use crate::lyrics::{self, LyricsState};
 use crate::metadata;
@@ -216,6 +217,7 @@ pub struct App {
     pub audio: AudioEngine,
     pub downloads: DownloadQueue,
     pub mpris: MprisBridge,
+    pub discord: DiscordRpcBridge,
     pub covers: CoverManager,
 
     pub focus: FocusPane,
@@ -274,6 +276,7 @@ pub struct App {
     pub areas: LayoutAreas,
     last_mpris_push: Instant,
     last_theme_poll: Instant,
+    last_discord_sync: Option<(u64, bool, u64, Instant)>,
 }
 
 impl App {
@@ -283,6 +286,7 @@ impl App {
         let audio = AudioEngine::spawn(cfg.volume, cfg.output_device.clone());
         let downloads = DownloadQueue::new();
         let mpris = MprisBridge::new();
+        let discord = DiscordRpcBridge::new(headless, cfg.discord_client_id.clone());
         let covers = if headless {
             CoverManager::new_headless()
         } else {
@@ -313,6 +317,7 @@ impl App {
             audio,
             downloads,
             mpris,
+            discord,
             covers,
             focus: FocusPane::Main,
             modal: ModalState::None,
@@ -364,6 +369,7 @@ impl App {
             areas: LayoutAreas::default(),
             last_mpris_push: Instant::now(),
             last_theme_poll: Instant::now(),
+            last_discord_sync: None,
         };
 
         if !headless {
@@ -525,6 +531,7 @@ impl App {
             let paused = self.audio.telemetry.is_paused.load(Ordering::Relaxed);
             let pos = self.audio.telemetry.position_ms.load(Ordering::Relaxed);
             self.mpris.update_playback(playing, paused, pos);
+            self.sync_discord_rpc(false);
         }
 
         // Periodically refresh Omarchy/Pywal theme if active
@@ -533,6 +540,62 @@ impl App {
             if matches!(self.config.theme_mode, ThemeMode::Omarchy | ThemeMode::Pywal) {
                 self.theme_mgr.reload_system_themes();
             }
+        }
+    }
+
+    fn sync_discord_rpc(&mut self, force: bool) {
+        if !self.config.discord_rpc || self.current_gen == 0 {
+            if self.last_discord_sync.is_some() {
+                self.last_discord_sync = None;
+                self.discord.clear();
+            }
+            return;
+        }
+        let Some(ref track) = self.current_track else {
+            if self.last_discord_sync.is_some() {
+                self.last_discord_sync = None;
+                self.discord.clear();
+            }
+            return;
+        };
+
+        let is_playing = self.audio.telemetry.is_playing.load(Ordering::Relaxed);
+        let is_buffering = self.audio.telemetry.is_buffering.load(Ordering::Relaxed);
+        let is_paused =
+            self.audio.telemetry.is_paused.load(Ordering::Relaxed) || (!is_playing && !is_buffering);
+        let elapsed_s = self.audio.telemetry.position_ms.load(Ordering::Relaxed) / 1000;
+        let dur_ms = self.audio.telemetry.duration_ms.load(Ordering::Relaxed);
+        let duration_s = if dur_ms > 0 { dur_ms / 1000 } else { track.duration };
+        let now_epoch = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let start_epoch = now_epoch.saturating_sub(elapsed_s);
+
+        let should_send = match self.last_discord_sync {
+            None => true,
+            Some((prev_id, prev_paused, prev_start, last_at)) => {
+                force
+                    || prev_id != track.id
+                    || prev_paused != is_paused
+                    || (!is_paused
+                        && start_epoch.abs_diff(prev_start) >= 4
+                        && last_at.elapsed() >= Duration::from_secs(2))
+            }
+        };
+
+        if should_send {
+            self.last_discord_sync = Some((track.id, is_paused, start_epoch, Instant::now()));
+            self.discord.update(Some(DiscordPresence {
+                track_id: track.id,
+                title: track.title.clone(),
+                artist: track.artist_name.clone(),
+                album: track.album_name.clone(),
+                cover_id: track.album_cover.clone(),
+                duration_secs: duration_s,
+                elapsed_secs: elapsed_s,
+                is_paused,
+            }));
         }
     }
 
@@ -1043,6 +1106,7 @@ impl App {
             self.current_gen =
                 self.audio
                     .play_local(path, track, self.config.drop_detection && !self.config.calm_mode);
+            self.sync_discord_rpc(true);
             return;
         }
 
@@ -1089,6 +1153,7 @@ impl App {
                 state,
             });
         });
+        self.sync_discord_rpc(true);
     }
 
     pub fn handle_track_finished(&mut self) {
@@ -1360,7 +1425,7 @@ impl App {
             MainView::Playlists => self.library.playlists.len(),
             MainView::Queue => self.filter_tracks(&self.queue).len(),
             MainView::LocalFiles => self.filter_tracks(&self.local_tracks).len(),
-            MainView::Settings => 9 + 1 + self.output_devices.len(),
+            MainView::Settings => 10 + 1 + self.output_devices.len(),
             MainView::Detail(d) => match d {
                 DetailContent::Album { tracks, .. }
                 | DetailContent::Playlist { tracks, .. }
@@ -2068,6 +2133,16 @@ impl App {
                 let _ = config::save(&self.config);
             }
             7 => {
+                self.config.discord_rpc = !self.config.discord_rpc;
+                let _ = config::save(&self.config);
+                self.notify(if self.config.discord_rpc {
+                    "Discord Rich Presence: ON"
+                } else {
+                    "Discord Rich Presence: OFF"
+                });
+                self.sync_discord_rpc(true);
+            }
+            8 => {
                 if let Err(e) = audio::clear_cache() {
                     self.notify(format!("Cache clear failed: {}", e));
                 } else {
@@ -2076,7 +2151,7 @@ impl App {
                     self.notify("Audio cache cleared");
                 }
             }
-            8 => {
+            9 => {
                 if self.session.is_some() {
                     let _ = auth::clear_session();
                     self.session = None;
@@ -2086,14 +2161,14 @@ impl App {
                     self.open_auth_modal();
                 }
             }
-            9 => {
+            10 => {
                 self.config.output_device = None;
                 self.audio.set_output_device(None);
                 let _ = config::save(&self.config);
                 self.notify("Audio output: System Default");
             }
             idx => {
-                let dev_idx = idx.saturating_sub(10);
+                let dev_idx = idx.saturating_sub(11);
                 if let Some(dev_name) = self.output_devices.get(dev_idx).cloned() {
                     self.config.output_device = Some(dev_name.clone());
                     self.audio.set_output_device(Some(dev_name.clone()));

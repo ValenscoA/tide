@@ -1383,6 +1383,10 @@ fn render_settings_view(f: &mut Frame, app: &mut App, area: Rect, theme: &Theme)
             if app.config.calm_mode { "On" } else { "Off" }.into(),
         ),
         (
+            "Discord Rich Presence".into(),
+            if app.config.discord_rpc { "Enabled" } else { "Disabled" }.into(),
+        ),
+        (
             "Clear Audio Cache".into(),
             format!("{} ({} tracks) — Enter to clear", fmt_bytes(app.cache_bytes), app.cache_count),
         ),

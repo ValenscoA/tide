@@ -94,6 +94,8 @@ pub struct Config {
     pub image_cover: bool,
     pub drop_detection: bool,
     pub calm_mode: bool,
+    pub discord_rpc: bool,
+    pub discord_client_id: String,
 }
 
 impl Default for Config {
@@ -108,6 +110,8 @@ impl Default for Config {
             image_cover: true,
             drop_detection: true,
             calm_mode: false,
+            discord_rpc: true,
+            discord_client_id: crate::discord::DEFAULT_DISCORD_CLIENT_ID.to_string(),
         }
     }
 }
