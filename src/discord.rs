@@ -5,6 +5,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde_json::{json, Value};
 
 pub const DEFAULT_DISCORD_CLIENT_ID: &str = "1130698654987067493";
+pub const REPO_URL: &str = "https://github.com/ValenscoA/tide";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiscordPresence {
@@ -132,9 +133,9 @@ pub fn build_set_activity_json(
                     clamp_discord_str(&format!("by {} (Paused)", p.artist.trim()), "Paused")
                 }
             } else if p.artist.trim().is_empty() {
-                clamp_discord_str("TIDAL", "TIDAL")
+                clamp_discord_str("tide", "tide")
             } else {
-                clamp_discord_str(&format!("by {}", p.artist.trim()), "TIDAL")
+                clamp_discord_str(&format!("by {}", p.artist.trim()), "tide")
             };
 
             let large_image = match p.cover_id {
@@ -146,9 +147,10 @@ pub fn build_set_activity_json(
                 }
                 _ => "tidal".to_string(),
             };
-            let large_text = clamp_discord_str(&p.album, "TIDAL");
+            let large_text = clamp_discord_str(&p.album, "tide");
 
             let mut obj = json!({
+                "name": "tide",
                 "type": 2,
                 "details": details,
                 "state": state,
@@ -173,12 +175,18 @@ pub fn build_set_activity_json(
                 obj["timestamps"] = ts;
             }
 
+            let mut buttons = Vec::new();
             if p.track_id > 0 {
-                obj["buttons"] = json!([{
+                buttons.push(json!({
                     "label": "Listen on TIDAL",
                     "url": format!("https://tidal.com/browse/track/{}", p.track_id),
-                }]);
+                }));
             }
+            buttons.push(json!({
+                "label": "Open Repo",
+                "url": REPO_URL,
+            }));
+            obj["buttons"] = Value::Array(buttons);
 
             obj
         }
@@ -406,6 +414,7 @@ mod tests {
         assert_eq!(val["cmd"], "SET_ACTIVITY");
         assert_eq!(val["args"]["pid"], 42);
         assert_eq!(val["nonce"], "7");
+        assert_eq!(val["args"]["activity"]["name"], "tide");
         assert_eq!(val["args"]["activity"]["type"], 2);
         assert_eq!(val["args"]["activity"]["details"], "Midnight Tide");
         assert_eq!(val["args"]["activity"]["state"], "by KATSEYE");
@@ -428,6 +437,10 @@ mod tests {
         assert_eq!(
             val["args"]["activity"]["buttons"][0]["url"],
             "https://tidal.com/browse/track/123456"
+        );
+        assert_eq!(
+            val["args"]["activity"]["buttons"][1]["url"],
+            "https://github.com/ValenscoA/tide"
         );
 
         let mut paused_p = p.clone();
