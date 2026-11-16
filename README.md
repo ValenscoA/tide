@@ -35,6 +35,27 @@ A minimalist, transparent Rust terminal music player for Tidal built with `ratat
   - Full Vim + arrow keyboard navigation and mouse support (click to select/play, scroll wheel volume/lists).
   - Live `cpal` audio output device picker and cache stats in **Settings**.
 
+## Installation
+
+### Quick install (`curl`)
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ValenscoA/tide/main/install.sh | bash
+```
+
+Pin a specific release or force a source build:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ValenscoA/tide/main/install.sh | bash -s -- --version v0.1.0
+curl -fsSL https://raw.githubusercontent.com/ValenscoA/tide/main/install.sh | bash -s -- --from-source
+```
+
+Or install directly with Cargo:
+
+```sh
+cargo install --git https://github.com/ValenscoA/tide
+```
+
 ## Usage
 
 ```bash
